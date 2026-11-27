@@ -1,5 +1,6 @@
 package com.example.orderservice.controller;
 
+import com.example.orderservice.dto.ProductResponse;
 import com.example.orderservice.entity.Order;
 import com.example.orderservice.service.OrderService;
 import jakarta.validation.Valid;
@@ -19,6 +20,12 @@ public class OrderController {
 
     public OrderController(OrderService orderService) {
         this.orderService = orderService;
+    }
+
+    // Endpoint kiểm tra giao tiếp đồng bộ giữa hai Microservices bằng RestClient
+    @GetMapping("/product/{id}")
+    public ProductResponse getProduct(@PathVariable Long id) {
+        return orderService.getProduct(id);
     }
 
     @GetMapping
