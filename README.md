@@ -3,10 +3,7 @@
 **Sinh viên thực hiện:** Võ Thị Thúy An  
 **Học phần:** Lập trình Web 3 – Spring Boot & Microservices (Lab 02)
 
----
-
 ## 1. Cấu trúc thư mục dự án
-```text
 vothithuyan-microservices/
 │
 ├── backend/
@@ -20,7 +17,6 @@ vothithuyan-microservices/
 │
 ├── .gitignore
 └── README.md
-```
 
 ## 2. Danh sách Microservices
 1. **Menu & Recipe Service** (Port `8081`, CSDL MySQL): Quản lý danh mục món, nguyên liệu, topping, size và thiết lập công thức/định lượng pha chế chuẩn.
