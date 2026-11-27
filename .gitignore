@@ -3,6 +3,12 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Node / Frontend ###
+node_modules/
+dist/
+.env.local
+.env.*.local
+
 ### STS ###
 .apt_generated
 .classpath
@@ -21,7 +27,6 @@ target/
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
-/dist/
 /nbattrs.xml
 /nb-configuration.xml
 
