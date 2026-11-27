@@ -1,6 +1,10 @@
 package com.example.orderservice.service;
 
 import com.example.orderservice.client.ProductClient;
+import com.example.orderservice.dto.OrderItemRequest;
+import com.example.orderservice.dto.OrderItemResponse;
+import com.example.orderservice.dto.OrderRequest;
+import com.example.orderservice.dto.OrderResponse;
 import com.example.orderservice.dto.ProductResponse;
 import com.example.orderservice.entity.Order;
 import com.example.orderservice.entity.OrderItem;
@@ -30,101 +34,149 @@ public class OrderService {
         return productClient.getById(productId);
     }
 
-    public List<Order> getAll() {
-        return orderRepository.findAll();
+    public OrderResponse toOrderResponse(Order order) {
+        List<OrderItemResponse> itemResponses = order.getItems() != null ? order.getItems().stream().map(item ->
+                new OrderItemResponse(
+                        item.getId(),
+                        item.getProductId(),
+                        item.getProductName(),
+                        item.getSize(),
+                        item.getSugarLevel(),
+                        item.getIceLevel(),
+                        item.getToppings(),
+                        item.getQuantity(),
+                        item.getUnitPrice(),
+                        item.getSubtotal()
+                )
+        ).toList() : List.of();
+
+        return new OrderResponse(
+                order.getId(),
+                order.getOrderCode(),
+                order.getCustomerName(),
+                order.getCustomerPhone(),
+                order.getDeliveryAddress(),
+                order.getBranchId(),
+                order.getTotalAmount(),
+                order.getStatus(),
+                order.getPaymentMethod(),
+                itemResponses
+        );
     }
 
-    public Order getById(Long id) {
-        return orderRepository.findById(id)
+    public List<OrderResponse> getAll() {
+        return orderRepository.findAll()
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
+    }
+
+    public OrderResponse getById(Long id) {
+        Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
+        return toOrderResponse(order);
     }
 
-    public Order getByOrderCode(String orderCode) {
-        return orderRepository.findByOrderCode(orderCode)
+    public OrderResponse getByOrderCode(String orderCode) {
+        Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+        return toOrderResponse(order);
     }
 
-    public List<Order> getByStatus(String status) {
-        return orderRepository.findByStatus(status);
+    public List<OrderResponse> getByStatus(String status) {
+        return orderRepository.findByStatus(status)
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
     }
 
-    public List<Order> getByBranchId(Long branchId) {
-        return orderRepository.findByBranchId(branchId);
+    public List<OrderResponse> getByBranchId(Long branchId) {
+        return orderRepository.findByBranchId(branchId)
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
     }
 
-    public List<Order> getByCustomerPhone(String phone) {
-        return orderRepository.findByCustomerPhone(phone);
+    public List<OrderResponse> getByCustomerPhone(String phone) {
+        return orderRepository.findByCustomerPhone(phone)
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
+    }
+
+    /**
+     * Quy trình nghiệp vụ liên Microservice (Câu C - Lab 03):
+     * 1. Tiếp nhận danh sách sản phẩm và số lượng từ OrderRequest.
+     * 2. Gọi Menu/Product Service qua RestClient để lấy thông tin và đơn giá mới nhất.
+     * 3. Tính thành tiền (subtotal) cho từng món và tổng tiền (totalAmount) của toàn bộ đơn hàng.
+     * 4. Lưu thông tin đơn hàng và chi tiết các món vào SQL Server.
+     * 5. Trả về kết quả thông qua OrderResponse.
+     */
+    @Transactional
+    public OrderResponse createOrder(OrderRequest request) {
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        Order order = new Order();
+
+        String timePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        int randomPart = ThreadLocalRandom.current().nextInt(100, 999);
+        order.setOrderCode("ORD-" + timePart + "-" + randomPart);
+
+        order.setCustomerName(request.customerName() != null && !request.customerName().trim().isEmpty() ? request.customerName() : "Khách hàng online");
+        order.setCustomerPhone(request.customerPhone() != null && !request.customerPhone().trim().isEmpty() ? request.customerPhone() : "0900000000");
+        order.setDeliveryAddress(request.deliveryAddress());
+        order.setBranchId(request.branchId() != null ? request.branchId() : 1L);
+        order.setPaymentMethod(request.paymentMethod() != null ? request.paymentMethod() : "COD");
+        order.setStatus("PENDING");
+        order.setCreatedAt(LocalDateTime.now());
+
+        for (OrderItemRequest itemReq : request.items()) {
+            // 1. Gọi Product Service để lấy thông tin món và đơn giá
+            ProductResponse product = productClient.getById(itemReq.productId());
+
+            // 2. Tính thành tiền của từng món
+            BigDecimal unitPrice = product.price();
+            BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(itemReq.quantity()));
+
+            // 3. Tính tổng tiền đơn hàng
+            totalAmount = totalAmount.add(amount);
+
+            // 4. Tạo OrderItem tương ứng
+            OrderItem item = new OrderItem();
+            item.setProductId(product.id());
+            item.setProductName(product.name());
+            item.setQuantity(itemReq.quantity());
+            item.setUnitPrice(unitPrice);
+            item.setSubtotal(amount);
+            item.setSize(itemReq.size() != null ? itemReq.size() : "M");
+            item.setSugarLevel(itemReq.sugarLevel() != null ? itemReq.sugarLevel() : "100%");
+            item.setIceLevel(itemReq.iceLevel() != null ? itemReq.iceLevel() : "100%");
+            item.setToppings(itemReq.toppings());
+
+            order.addItem(item);
+        }
+
+        // Cập nhật tổng tiền đơn hàng
+        order.setTotalAmount(totalAmount);
+
+        // Lưu Order và OrderItem vào Database
+        Order savedOrder = orderRepository.save(order);
+
+        // Trả về kết quả thông qua OrderResponse
+        return toOrderResponse(savedOrder);
     }
 
     @Transactional
-    public Order create(Order order) {
-        // Sinh mã đơn hàng ngẫu nhiên theo thời gian
-        if (order.getOrderCode() == null || order.getOrderCode().trim().isEmpty()) {
-            String timePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-            int randomPart = ThreadLocalRandom.current().nextInt(100, 999);
-            order.setOrderCode("ORD-" + timePart + "-" + randomPart);
-        }
-
-        if (order.getCreatedAt() == null) {
-            order.setCreatedAt(LocalDateTime.now());
-        }
-        if (order.getStatus() == null) {
-            order.setStatus("PENDING");
-        }
-        if (order.getPaymentMethod() == null) {
-            order.setPaymentMethod("COD");
-        }
-
-        // Tính subtotal cho từng item và cộng dồn totalAmount
-        BigDecimal calculatedTotal = BigDecimal.ZERO;
-        if (order.getItems() != null && !order.getItems().isEmpty()) {
-            for (OrderItem item : order.getItems()) {
-                item.setOrder(order);
-                if (item.getUnitPrice() != null && item.getQuantity() != null) {
-                    BigDecimal subtotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-                    item.setSubtotal(subtotal);
-                    calculatedTotal = calculatedTotal.add(subtotal);
-                }
-            }
-        }
-        if (order.getTotalAmount() == null || order.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            order.setTotalAmount(calculatedTotal);
-        }
-
-        return orderRepository.save(order);
-    }
-
-    @Transactional
-    public Order updateStatus(Long id, String status) {
-        Order existing = getById(id);
+    public OrderResponse updateStatus(Long id, String status) {
+        Order existing = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
         existing.setStatus(status.toUpperCase());
-        return orderRepository.save(existing);
-    }
-
-    @Transactional
-    public Order update(Long id, Order updatedOrder) {
-        Order existing = getById(id);
-        existing.setCustomerName(updatedOrder.getCustomerName());
-        existing.setCustomerPhone(updatedOrder.getCustomerPhone());
-        existing.setDeliveryAddress(updatedOrder.getDeliveryAddress());
-        if (updatedOrder.getBranchId() != null) {
-            existing.setBranchId(updatedOrder.getBranchId());
-        }
-        if (updatedOrder.getStatus() != null) {
-            existing.setStatus(updatedOrder.getStatus());
-        }
-        if (updatedOrder.getPaymentMethod() != null) {
-            existing.setPaymentMethod(updatedOrder.getPaymentMethod());
-        }
-        if (updatedOrder.getTotalAmount() != null) {
-            existing.setTotalAmount(updatedOrder.getTotalAmount());
-        }
-        return orderRepository.save(existing);
+        return toOrderResponse(orderRepository.save(existing));
     }
 
     @Transactional
     public void delete(Long id) {
-        Order existing = getById(id);
+        Order existing = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
         orderRepository.delete(existing);
     }
 }

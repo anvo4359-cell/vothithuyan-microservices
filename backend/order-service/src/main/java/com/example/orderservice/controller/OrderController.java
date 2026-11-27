@@ -1,7 +1,8 @@
 package com.example.orderservice.controller;
 
+import com.example.orderservice.dto.OrderRequest;
+import com.example.orderservice.dto.OrderResponse;
 import com.example.orderservice.dto.ProductResponse;
-import com.example.orderservice.entity.Order;
 import com.example.orderservice.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -22,59 +23,55 @@ public class OrderController {
         this.orderService = orderService;
     }
 
-    // Endpoint kiểm tra giao tiếp đồng bộ giữa hai Microservices bằng RestClient
+    // Endpoint kiểm tra giao tiếp đồng bộ giữa hai Microservices bằng RestClient (Câu B)
     @GetMapping("/product/{id}")
     public ProductResponse getProduct(@PathVariable Long id) {
         return orderService.getProduct(id);
     }
 
     @GetMapping
-    public ResponseEntity<List<Order>> getAll(
+    public List<OrderResponse> getAll(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) String phone) {
 
         if (status != null && !status.trim().isEmpty()) {
-            return ResponseEntity.ok(orderService.getByStatus(status.trim().toUpperCase()));
+            return orderService.getByStatus(status.trim().toUpperCase());
         }
         if (branchId != null) {
-            return ResponseEntity.ok(orderService.getByBranchId(branchId));
+            return orderService.getByBranchId(branchId);
         }
         if (phone != null && !phone.trim().isEmpty()) {
-            return ResponseEntity.ok(orderService.getByCustomerPhone(phone.trim()));
+            return orderService.getByCustomerPhone(phone.trim());
         }
-        return ResponseEntity.ok(orderService.getAll());
+        return orderService.getAll();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Order> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(orderService.getById(id));
+    public OrderResponse getById(@PathVariable Long id) {
+        return orderService.getById(id);
     }
 
     @GetMapping("/code/{orderCode}")
-    public ResponseEntity<Order> getByCode(@PathVariable String orderCode) {
-        return ResponseEntity.ok(orderService.getByOrderCode(orderCode));
+    public OrderResponse getByCode(@PathVariable String orderCode) {
+        return orderService.getByOrderCode(orderCode);
     }
 
+    // Endpoint tạo đơn hàng liên Microservice (Câu C - Lab 03)
     @PostMapping
-    public ResponseEntity<Order> create(@Valid @RequestBody Order order) {
-        Order created = orderService.create(order);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<Order> update(@PathVariable Long id, @Valid @RequestBody Order order) {
-        Order updated = orderService.update(id, order);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderRequest request) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(orderService.createOrder(request));
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<Order> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> statusBody) {
+    public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> statusBody) {
         String newStatus = statusBody.get("status");
         if (newStatus == null || newStatus.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        Order updated = orderService.updateStatus(id, newStatus.trim());
+        OrderResponse updated = orderService.updateStatus(id, newStatus.trim());
         return ResponseEntity.ok(updated);
     }
 
