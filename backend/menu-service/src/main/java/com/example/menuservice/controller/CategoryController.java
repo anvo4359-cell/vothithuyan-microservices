@@ -1,6 +1,7 @@
 package com.example.menuservice.controller;
 
-import com.example.menuservice.entity.Category;
+import com.example.menuservice.dto.CategoryRequest;
+import com.example.menuservice.dto.CategoryResponse;
 import com.example.menuservice.service.CategoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,27 +22,27 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Category>> getAll(@RequestParam(required = false) Boolean activeOnly) {
+    public List<CategoryResponse> getAll(@RequestParam(required = false) Boolean activeOnly) {
         if (Boolean.TRUE.equals(activeOnly)) {
-            return ResponseEntity.ok(categoryService.getActiveCategories());
+            return categoryService.getActiveCategories();
         }
-        return ResponseEntity.ok(categoryService.getAll());
+        return categoryService.getAll();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Category> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(categoryService.getById(id));
+    public CategoryResponse getById(@PathVariable Long id) {
+        return categoryService.getById(id);
     }
 
     @PostMapping
-    public ResponseEntity<Category> create(@Valid @RequestBody Category category) {
-        Category created = categoryService.create(category);
+    public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CategoryRequest request) {
+        CategoryResponse created = categoryService.create(request);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Category> update(@PathVariable Long id, @Valid @RequestBody Category category) {
-        Category updated = categoryService.update(id, category);
+    public ResponseEntity<CategoryResponse> update(@PathVariable Long id, @Valid @RequestBody CategoryRequest request) {
+        CategoryResponse updated = categoryService.update(id, request);
         return ResponseEntity.ok(updated);
     }
 

@@ -1,6 +1,7 @@
 package com.example.menuservice.controller;
 
-import com.example.menuservice.entity.Product;
+import com.example.menuservice.dto.ProductRequest;
+import com.example.menuservice.dto.ProductResponse;
 import com.example.menuservice.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,37 +22,37 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Product>> getAll(
+    public List<ProductResponse> getAll(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean activeOnly) {
 
         if (categoryId != null) {
-            return ResponseEntity.ok(productService.getByCategoryId(categoryId));
+            return productService.getByCategoryId(categoryId);
         }
         if (search != null && !search.trim().isEmpty()) {
-            return ResponseEntity.ok(productService.searchByName(search.trim()));
+            return productService.searchByName(search.trim());
         }
         if (Boolean.TRUE.equals(activeOnly)) {
-            return ResponseEntity.ok(productService.getActiveProducts());
+            return productService.getActiveProducts();
         }
-        return ResponseEntity.ok(productService.getAll());
+        return productService.getAll();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.getById(id));
+    public ProductResponse getById(@PathVariable Long id) {
+        return productService.getById(id);
     }
 
     @PostMapping
-    public ResponseEntity<Product> create(@Valid @RequestBody Product product) {
-        Product created = productService.create(product);
+    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
+        ProductResponse created = productService.create(request);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(@PathVariable Long id, @Valid @RequestBody Product product) {
-        Product updated = productService.update(id, product);
+    public ResponseEntity<ProductResponse> update(@PathVariable Long id, @Valid @RequestBody ProductRequest request) {
+        ProductResponse updated = productService.update(id, request);
         return ResponseEntity.ok(updated);
     }
 

@@ -1,5 +1,7 @@
 package com.example.menuservice.service;
 
+import com.example.menuservice.dto.ProductRequest;
+import com.example.menuservice.dto.ProductResponse;
 import com.example.menuservice.entity.Category;
 import com.example.menuservice.entity.Product;
 import com.example.menuservice.exception.ResourceNotFoundException;
@@ -21,61 +23,90 @@ public class ProductService {
         this.categoryRepository = categoryRepository;
     }
 
-    public List<Product> getAll() {
-        return productRepository.findAll();
+    private ProductResponse toResponse(Product product) {
+        return new ProductResponse(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getBasePrice(),
+                product.getImageUrl(),
+                product.getCategory() != null ? product.getCategory().getId() : null,
+                product.getCategory() != null ? product.getCategory().getName() : null
+        );
     }
 
-    public List<Product> getActiveProducts() {
-        return productRepository.findByActiveTrue();
+    public List<ProductResponse> getAll() {
+        return productRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public List<Product> getByCategoryId(Long categoryId) {
-        return productRepository.findByCategoryId(categoryId);
+    public List<ProductResponse> getActiveProducts() {
+        return productRepository.findByActiveTrue()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public List<Product> searchByName(String keyword) {
-        return productRepository.findByNameContainingIgnoreCase(keyword);
+    public List<ProductResponse> getByCategoryId(Long categoryId) {
+        return productRepository.findByCategoryId(categoryId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public Product getById(Long id) {
-        return productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món với ID: " + id));
+    public List<ProductResponse> searchByName(String keyword) {
+        return productRepository.findByNameContainingIgnoreCase(keyword)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public ProductResponse getById(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm: " + id));
+        return toResponse(product);
     }
 
     @Transactional
-    public Product create(Product product) {
-        if (product.getCategory() != null && product.getCategory().getId() != null) {
-            Category category = categoryRepository.findById(product.getCategory().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục ID: " + product.getCategory().getId()));
+    public ProductResponse create(ProductRequest request) {
+        Product product = new Product();
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setBasePrice(request.price());
+        product.setImageUrl(request.imageUrl());
+        product.setActive(true);
+
+        if (request.categoryId() != null) {
+            Category category = categoryRepository.findById(request.categoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục ID: " + request.categoryId()));
             product.setCategory(category);
         }
-        if (product.getActive() == null) {
-            product.setActive(true);
-        }
-        return productRepository.save(product);
+        return toResponse(productRepository.save(product));
     }
 
     @Transactional
-    public Product update(Long id, Product updatedProduct) {
-        Product existing = getById(id);
-        existing.setName(updatedProduct.getName());
-        existing.setDescription(updatedProduct.getDescription());
-        existing.setBasePrice(updatedProduct.getBasePrice());
-        existing.setImageUrl(updatedProduct.getImageUrl());
-        if (updatedProduct.getActive() != null) {
-            existing.setActive(updatedProduct.getActive());
+    public ProductResponse update(Long id, ProductRequest request) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm: " + id));
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setBasePrice(request.price());
+        product.setImageUrl(request.imageUrl());
+
+        if (request.categoryId() != null) {
+            Category category = categoryRepository.findById(request.categoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục ID: " + request.categoryId()));
+            product.setCategory(category);
         }
-        if (updatedProduct.getCategory() != null && updatedProduct.getCategory().getId() != null) {
-            Category category = categoryRepository.findById(updatedProduct.getCategory().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục ID: " + updatedProduct.getCategory().getId()));
-            existing.setCategory(category);
-        }
-        return productRepository.save(existing);
+        return toResponse(productRepository.save(product));
     }
 
     @Transactional
     public void delete(Long id) {
-        Product existing = getById(id);
-        productRepository.delete(existing);
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm: " + id));
+        productRepository.delete(product);
     }
 }

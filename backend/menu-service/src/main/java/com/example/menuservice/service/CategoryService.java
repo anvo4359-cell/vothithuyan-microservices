@@ -1,5 +1,7 @@
 package com.example.menuservice.service;
 
+import com.example.menuservice.dto.CategoryRequest;
+import com.example.menuservice.dto.CategoryResponse;
 import com.example.menuservice.entity.Category;
 import com.example.menuservice.exception.ResourceNotFoundException;
 import com.example.menuservice.repository.CategoryRepository;
@@ -17,41 +19,56 @@ public class CategoryService {
         this.categoryRepository = categoryRepository;
     }
 
-    public List<Category> getAll() {
-        return categoryRepository.findAll();
+    private CategoryResponse toResponse(Category category) {
+        return new CategoryResponse(
+                category.getId(),
+                category.getName(),
+                category.getDescription()
+        );
     }
 
-    public List<Category> getActiveCategories() {
-        return categoryRepository.findByActiveTrue();
+    public List<CategoryResponse> getAll() {
+        return categoryRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public Category getById(Long id) {
-        return categoryRepository.findById(id)
+    public List<CategoryResponse> getActiveCategories() {
+        return categoryRepository.findByActiveTrue()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public CategoryResponse getById(Long id) {
+        Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với ID: " + id));
+        return toResponse(category);
     }
 
     @Transactional
-    public Category create(Category category) {
-        if (category.getActive() == null) {
-            category.setActive(true);
-        }
-        return categoryRepository.save(category);
+    public CategoryResponse create(CategoryRequest request) {
+        Category category = new Category();
+        category.setName(request.name());
+        category.setDescription(request.description());
+        category.setActive(true);
+        return toResponse(categoryRepository.save(category));
     }
 
     @Transactional
-    public Category update(Long id, Category updatedCategory) {
-        Category existing = getById(id);
-        existing.setName(updatedCategory.getName());
-        existing.setDescription(updatedCategory.getDescription());
-        if (updatedCategory.getActive() != null) {
-            existing.setActive(updatedCategory.getActive());
-        }
-        return categoryRepository.save(existing);
+    public CategoryResponse update(Long id, CategoryRequest request) {
+        Category existing = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với ID: " + id));
+        existing.setName(request.name());
+        existing.setDescription(request.description());
+        return toResponse(categoryRepository.save(existing));
     }
 
     @Transactional
     public void delete(Long id) {
-        Category existing = getById(id);
+        Category existing = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với ID: " + id));
         categoryRepository.delete(existing);
     }
 }
